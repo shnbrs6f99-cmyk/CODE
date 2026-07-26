@@ -33,7 +33,11 @@ def test_fifo_allocation_and_interest():
     assert result.allocations[0].charge_voucher == "INV-1"
     assert result.allocations[0].amount == Decimal(1000)
     assert result.outstanding_principal == Decimal("500.00")
-    assert result.total_interest == Decimal("11.10")
+    assert [(line.voucher_number, line.days_overdue, line.interest) for line in result.interest_lines] == [
+        ("INV-1", 15, Decimal("7.40")),
+        ("INV-2", 45, Decimal("11.10")),
+    ]
+    assert result.total_interest == Decimal("18.50")
 
 
 def test_unallocated_credit_is_preserved():
