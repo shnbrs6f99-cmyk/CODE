@@ -8,6 +8,7 @@ from pathlib import Path
 from threading import Event
 from typing import Callable, Iterable
 
+from .diagnostics import ParserDiagnosticsExporter
 from .domain import CalculationResult, InterestRules
 from .engine import InterestCalculator
 from .parser import TallyLedgerParser
@@ -26,6 +27,7 @@ class ProcessingOutcome:
     result: CalculationResult | None = None
     validations: list[ValidationMessage] | None = None
     error: str = ""
+    diagnostic_bundle: Path | None = None
 
 
 class StatementProcessingService:
@@ -35,10 +37,14 @@ class StatementProcessingService:
         self.validator = LedgerValidator()
         self.calculator = InterestCalculator()
         self.reporter = ExcelReportGenerator()
+        self.diagnostics = ParserDiagnosticsExporter()
 
     def process(self, source: Path, output_dir: Path, rules: InterestRules) -> ProcessingOutcome:
-        digest = self._hash(source)
+        source = Path(source)
+        output_dir = Path(output_dir)
+        digest = ""
         try:
+            digest = self._hash(source)
             statement = self.parser.parse(source)
             validations = self.validator.validate(statement)
             result = self.calculator.calculate(statement, rules)
@@ -55,8 +61,26 @@ class StatementProcessingService:
             return ProcessingOutcome(source, True, output, result, validations)
         except Exception as exc:
             log.exception("Processing failed for %s", source)
-            self.database.add_history(source, digest, source.stem, "failed", None, str(exc))
-            return ProcessingOutcome(source, False, error=str(exc))
+            diagnostic: Path | None = None
+            try:
+                diagnostics_dir = output_dir / "Parser Diagnostics"
+                diagnostic = self._unique_output(
+                    diagnostics_dir,
+                    f"{self._safe_name(source.stem)}_Parser_Diagnostics.zip",
+                )
+                self.diagnostics.export(source, diagnostic, exc)
+            except Exception:
+                log.exception("Unable to generate parser diagnostics for %s", source)
+            try:
+                self.database.add_history(source, digest, source.stem, "failed", None, str(exc))
+            except Exception:
+                log.exception("Unable to record failed processing history for %s", source)
+            return ProcessingOutcome(
+                source,
+                False,
+                error=str(exc),
+                diagnostic_bundle=diagnostic,
+            )
 
     def process_batch(
         self,
@@ -76,7 +100,12 @@ class StatementProcessingService:
                     for pending in futures:
                         pending.cancel()
                     break
-                outcome = future.result()
+                try:
+                    outcome = future.result()
+                except Exception as exc:  # one worker must never terminate the whole batch
+                    source = futures[future]
+                    log.exception("Unhandled batch worker failure for %s", source)
+                    outcome = ProcessingOutcome(source, False, error=str(exc))
                 outcomes.append(outcome)
                 if progress:
                     progress(len(outcomes), len(files), outcome)
