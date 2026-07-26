@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, cast
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.page import PageMargins
+from openpyxl.worksheet.properties import PageSetupProperties
 from openpyxl.worksheet.worksheet import Worksheet
 
 from .domain import CalculationResult, InterestRules
@@ -18,7 +20,13 @@ class ExcelReportGenerator:
     SUBHEADER_FILL = PatternFill("solid", fgColor="D9EAF7")
     WHITE_BOLD = Font(color="FFFFFF", bold=True)
     BOLD = Font(bold=True)
-    THIN = Border(*(Side(style="thin", color="B7B7B7") for _ in range(4)))
+    THIN_SIDE = Side(style="thin", color="B7B7B7")
+    THIN = Border(
+        left=THIN_SIDE,
+        right=THIN_SIDE,
+        top=THIN_SIDE,
+        bottom=THIN_SIDE,
+    )
     MONEY = '#,##0.00;[Red]-#,##0.00'
     DATE = "dd-mmm-yyyy"
 
@@ -31,7 +39,7 @@ class ExcelReportGenerator:
     ) -> Path:
         output.parent.mkdir(parents=True, exist_ok=True)
         wb = Workbook()
-        summary = wb.active
+        summary = cast(Worksheet, wb.active)
         self._summary(summary, result, rules)
         self._transactions(wb.create_sheet("Transactions"), result)
         self._allocations(wb.create_sheet("FIFO Allocations"), result)
@@ -55,7 +63,7 @@ class ExcelReportGenerator:
         ws["A1"].fill = self.HEADER_FILL
         ws["A1"].font = Font(color="FFFFFF", bold=True, size=16)
         ws["A1"].alignment = Alignment(horizontal="center")
-        rows = [
+        rows: list[tuple[str, Any]] = [
             ("Customer", result.statement.customer_name),
             ("Source file", result.statement.source_file.name),
             (
@@ -72,7 +80,7 @@ class ExcelReportGenerator:
         ]
         for row, (label, value) in enumerate(rows, start=3):
             ws.cell(row, 1, label).font = self.BOLD
-            ws.cell(row, 2, value)
+            ws.cell(row, 2, cast(Any, value))
             ws.cell(row, 1).fill = self.SUBHEADER_FILL
             ws.cell(row, 1).border = ws.cell(row, 2).border = self.THIN
         ws["B6"].number_format = "0.00%"
@@ -86,7 +94,7 @@ class ExcelReportGenerator:
         headers = ["Date", "Voucher Type", "Voucher No.", "Narration", "Debit", "Credit", "Page"]
         self._table_header(ws, headers)
         for idx, tx in enumerate(result.statement.transactions, start=2):
-            values = [
+            values: list[Any] = [
                 tx.transaction_date,
                 tx.voucher_type.value,
                 tx.voucher_number,
@@ -96,7 +104,7 @@ class ExcelReportGenerator:
                 tx.source_page,
             ]
             for col, value in enumerate(values, start=1):
-                ws.cell(idx, col, value).border = self.THIN
+                ws.cell(idx, col, cast(Any, value)).border = self.THIN
             ws.cell(idx, 1).number_format = self.DATE
             ws.cell(idx, 5).number_format = ws.cell(idx, 6).number_format = self.MONEY
         self._finish_table(ws, [14, 18, 18, 48, 16, 16, 10])
@@ -111,7 +119,7 @@ class ExcelReportGenerator:
         ]
         self._table_header(ws, headers)
         for idx, item in enumerate(result.allocations, start=2):
-            values = [
+            values: list[Any] = [
                 item.charge_voucher,
                 item.charge_date,
                 item.payment_voucher,
@@ -119,7 +127,7 @@ class ExcelReportGenerator:
                 float(item.amount),
             ]
             for col, value in enumerate(values, start=1):
-                ws.cell(idx, col, value).border = self.THIN
+                ws.cell(idx, col, cast(Any, value)).border = self.THIN
             ws.cell(idx, 2).number_format = ws.cell(idx, 4).number_format = self.DATE
             ws.cell(idx, 5).number_format = self.MONEY
         self._finish_table(ws, [20, 14, 20, 14, 20])
@@ -138,7 +146,7 @@ class ExcelReportGenerator:
         ]
         self._table_header(ws, headers)
         for idx, line in enumerate(result.interest_lines, start=2):
-            values = [
+            values: list[Any] = [
                 line.voucher_number,
                 line.voucher_type.value,
                 line.transaction_date,
@@ -150,7 +158,7 @@ class ExcelReportGenerator:
                 float(line.interest),
             ]
             for col, value in enumerate(values, start=1):
-                ws.cell(idx, col, value).border = self.THIN
+                ws.cell(idx, col, cast(Any, value)).border = self.THIN
             for col in (3, 4, 5):
                 ws.cell(idx, col).number_format = self.DATE
             ws.cell(idx, 6).number_format = ws.cell(idx, 9).number_format = self.MONEY
@@ -169,9 +177,9 @@ class ExcelReportGenerator:
     ) -> None:
         self._table_header(ws, ["Severity", "Code", "Message"])
         for idx, item in enumerate(validations, start=2):
-            values = [item.severity.value.upper(), item.code, item.message]
+            values: list[Any] = [item.severity.value.upper(), item.code, item.message]
             for col, value in enumerate(values, start=1):
-                ws.cell(idx, col, value).border = self.THIN
+                ws.cell(idx, col, cast(Any, value)).border = self.THIN
         start = len(validations) + 4
         ws.cell(start, 1, "Parser").font = self.BOLD
         ws.cell(start, 2, result.statement.parser_name)
@@ -201,7 +209,10 @@ class ExcelReportGenerator:
         ws.page_setup.orientation = "landscape"
         ws.page_setup.fitToWidth = 1
         ws.page_setup.fitToHeight = 0
-        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.sheet_properties.pageSetUpPr = PageSetupProperties(
+            fitToPage=True,
+            autoPageBreaks=False,
+        )
         ws.page_margins = PageMargins(
             left=0.25,
             right=0.25,
@@ -210,4 +221,6 @@ class ExcelReportGenerator:
             header=0.2,
             footer=0.2,
         )
-        ws.oddFooter.center.text = "Page &P of &N"
+        footer = ws.oddFooter
+        if footer is not None:
+            footer.center.text = "Page &P of &N"
