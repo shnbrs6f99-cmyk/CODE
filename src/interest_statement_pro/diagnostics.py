@@ -7,10 +7,10 @@ import sys
 import traceback
 import zipfile
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from .parser import PdfTextExtractor
+from .parser import PdfParseError, PdfTextExtractor
 
 
 @dataclass(slots=True)
@@ -54,7 +54,7 @@ class ParserDiagnosticsExporter:
             extracted = self.extractor.extract(source)
             pages = extracted.pages
             extraction_status = "success"
-        except Exception as exc:  # diagnostics must never mask the original error
+        except (PdfParseError, OSError, ValueError, TypeError) as exc:
             extraction_status = "failed"
             extraction_error = f"{type(exc).__name__}: {exc}"
 
@@ -65,7 +65,7 @@ class ParserDiagnosticsExporter:
         )
         digest = self._sha256(source) if source.exists() else ""
         manifest = DiagnosticManifest(
-            generated_at_utc=datetime.now(timezone.utc).isoformat(),
+            generated_at_utc=datetime.now(UTC).isoformat(),
             application_version=self.application_version,
             python_version=sys.version,
             platform=platform.platform(),
@@ -83,7 +83,10 @@ class ParserDiagnosticsExporter:
             archive.writestr("processing_error.txt", processing_error)
             archive.writestr(
                 "extracted_text.txt",
-                "\n\n".join(f"===== PAGE {index} =====\n{text}" for index, text in enumerate(pages, 1)),
+                "\n\n".join(
+                    f"===== PAGE {index} =====\n{text}"
+                    for index, text in enumerate(pages, 1)
+                ),
             )
             archive.writestr(
                 "README.txt",

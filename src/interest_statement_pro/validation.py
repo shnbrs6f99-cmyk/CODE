@@ -43,7 +43,7 @@ class LedgerValidator:
                 messages.append(ValidationMessage("BOTH_SIDES", Severity.WARNING, f"Both debit and credit populated in {tx.voucher_number}"))
         if duplicates:
             messages.append(ValidationMessage("DUPLICATES", Severity.WARNING, f"{len(duplicates)} duplicate transaction signatures found"))
-        computed = statement.opening_balance + sum((t.signed_amount for t in statement.transactions), Decimal("0"))
+        computed = statement.opening_balance + sum((t.signed_amount for t in statement.transactions), Decimal(0))
         difference = (computed - statement.closing_balance).copy_abs()
         if difference > Decimal("0.05"):
             messages.append(ValidationMessage("RECONCILIATION", Severity.ERROR, f"Ledger does not reconcile; difference {difference}"))

@@ -24,8 +24,8 @@ class LedgerTransaction:
     voucher_type: VoucherType
     voucher_number: str
     narration: str
-    debit: Decimal = Decimal("0")
-    credit: Decimal = Decimal("0")
+    debit: Decimal = Decimal(0)
+    credit: Decimal = Decimal(0)
     source_page: int | None = None
     raw_text: str = ""
 
@@ -50,7 +50,7 @@ class LedgerStatement:
 
 @dataclass(slots=True, frozen=True)
 class InterestRules:
-    annual_rate: Decimal = Decimal("18")
+    annual_rate: Decimal = Decimal(18)
     credit_period_days: int = 30
     day_basis: int = 365
     grace_days: int = 0
@@ -58,7 +58,7 @@ class InterestRules:
     charge_on_debit_notes: bool = True
     credit_notes_reduce_oldest: bool = True
     include_opening_balance: bool = True
-    minimum_interest: Decimal = Decimal("0")
+    minimum_interest: Decimal = Decimal(0)
     round_places: int = 2
 
 

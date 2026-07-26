@@ -20,10 +20,10 @@ def test_database_settings_and_integrity(tmp_path: Path):
 
 def test_excel_workbook_contains_expected_sheets(tmp_path: Path):
     statement = LedgerStatement(
-        "Acme", date(2026, 1, 1), date(2026, 1, 31), Decimal("0"), Decimal("0"), [],
+        "Acme", date(2026, 1, 1), date(2026, 1, 31), Decimal(0), Decimal(0), [],
         Path("ledger.pdf"), "test",
     )
-    result = CalculationResult(statement, [], [], Decimal("0"), Decimal("0"), Decimal("0"))
+    result = CalculationResult(statement, [], [], Decimal(0), Decimal(0), Decimal(0))
     output = tmp_path / "statement.xlsx"
     ExcelReportGenerator().generate(result, InterestRules(), [], output)
     workbook = load_workbook(output, read_only=True)

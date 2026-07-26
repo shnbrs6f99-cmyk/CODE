@@ -1,0 +1,2 @@
+[console_scripts]
+interest-statement-pro = interest_statement_pro.app:main

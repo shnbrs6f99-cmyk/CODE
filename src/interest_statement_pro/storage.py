@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterator
 
 from platformdirs import user_data_path
 
@@ -70,15 +70,29 @@ class Database:
                 """
             )
 
-    def upsert_customer(self, name: str, email: str = "", phone: str = "", gstin: str = "", rate: str = "18", credit_days: int = 30) -> None:
-        now = datetime.now().isoformat(timespec="seconds")
+    @staticmethod
+    def _utc_now() -> str:
+        return datetime.now(UTC).isoformat(timespec="seconds")
+
+    def upsert_customer(
+        self,
+        name: str,
+        email: str = "",
+        phone: str = "",
+        gstin: str = "",
+        rate: str = "18",
+        credit_days: int = 30,
+    ) -> None:
+        now = self._utc_now()
         with self.connect() as db:
             db.execute(
-                """INSERT INTO customers(name,email,phone,gstin,interest_rate,credit_period_days,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?)
+                """INSERT INTO customers(
+                    name,email,phone,gstin,interest_rate,credit_period_days,created_at,updated_at
+                ) VALUES(?,?,?,?,?,?,?,?)
                 ON CONFLICT(name) DO UPDATE SET email=excluded.email, phone=excluded.phone,
                 gstin=excluded.gstin, interest_rate=excluded.interest_rate,
-                credit_period_days=excluded.credit_period_days, updated_at=excluded.updated_at""",
+                credit_period_days=excluded.credit_period_days,
+                updated_at=excluded.updated_at""",
                 (name.strip(), email.strip(), phone.strip(), gstin.strip(), rate, credit_days, now, now),
             )
 
@@ -90,8 +104,11 @@ class Database:
         payload = json.dumps(value)
         with self.connect() as db:
             db.execute(
-                "INSERT INTO settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
-                (key, payload, datetime.now().isoformat(timespec="seconds")),
+                """INSERT INTO settings(key,value,updated_at) VALUES(?,?,?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value=excluded.value,
+                    updated_at=excluded.updated_at""",
+                (key, payload, self._utc_now()),
             )
 
     def load_setting(self, key: str, default: object = None) -> object:
@@ -103,20 +120,46 @@ class Database:
         data = asdict(rules)
         data["annual_rate"] = str(rules.annual_rate)
         data["minimum_interest"] = str(rules.minimum_interest)
-        data["calculate_through"] = rules.calculate_through.isoformat() if rules.calculate_through else None
+        data["calculate_through"] = (
+            rules.calculate_through.isoformat() if rules.calculate_through else None
+        )
         self.save_setting("interest_rules", data)
 
-    def add_history(self, source: Path, source_hash: str, customer: str, status: str, output: Path | None, message: str = "") -> None:
+    def add_history(
+        self,
+        source: Path,
+        source_hash: str,
+        customer: str,
+        status: str,
+        output: Path | None,
+        message: str = "",
+    ) -> None:
         with self.connect() as db:
             db.execute(
-                "INSERT INTO processing_history(source_path,source_hash,customer_name,status,output_path,message,processed_at) VALUES(?,?,?,?,?,?,?)",
-                (str(source), source_hash, customer, status, str(output) if output else None, message, datetime.now().isoformat(timespec="seconds")),
+                """INSERT INTO processing_history(
+                    source_path,source_hash,customer_name,status,output_path,message,processed_at
+                ) VALUES(?,?,?,?,?,?,?)""",
+                (
+                    str(source),
+                    source_hash,
+                    customer,
+                    status,
+                    str(output) if output else None,
+                    message,
+                    self._utc_now(),
+                ),
             )
 
     def history(self, limit: int = 500) -> list[sqlite3.Row]:
         with self.connect() as db:
-            return list(db.execute("SELECT * FROM processing_history ORDER BY id DESC LIMIT ?", (limit,)))
+            return list(
+                db.execute(
+                    "SELECT * FROM processing_history ORDER BY id DESC LIMIT ?",
+                    (limit,),
+                )
+            )
 
     def integrity_check(self) -> bool:
         with self.connect() as db:
-            return db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            row = db.execute("PRAGMA integrity_check").fetchone()
+        return bool(row and row[0] == "ok")
