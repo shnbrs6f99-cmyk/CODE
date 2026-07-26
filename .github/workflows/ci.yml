@@ -2,21 +2,37 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/ruff-ci]
   pull_request:
+
+permissions:
+  contents: write
 
 jobs:
   test:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
       - name: Install
         run: python -m pip install -e ".[dev]"
-      - name: Ruff
+      - name: Ruff autofix
+        shell: powershell
+        run: |
+          python -m ruff check src tests --fix
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src tests
+          if (-not (git diff --cached --quiet)) {
+            git commit -m "style: apply Ruff autofixes"
+            git push origin HEAD:fix/ruff-ci
+          }
+      - name: Ruff verification
         run: python -m ruff check src tests
       - name: Mypy
         run: python -m mypy src
