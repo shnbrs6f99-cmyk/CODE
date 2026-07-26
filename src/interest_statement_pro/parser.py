@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from typing import ClassVar
 
 import pdfplumber
 from pypdf import PdfReader
@@ -38,13 +39,16 @@ class PdfTextExtractor:
                 return ExtractedPdf(pages=pages, encrypted=reader.is_encrypted)
         except PdfParseError:
             raise
-        except Exception:
+        except (OSError, ValueError, TypeError, RuntimeError):
             pages = []
 
         try:
             with pdfplumber.open(path) as pdf:
-                pages = [(page.extract_text(x_tolerance=2, y_tolerance=3) or "") for page in pdf.pages]
-        except Exception as exc:
+                pages = [
+                    page.extract_text(x_tolerance=2, y_tolerance=3) or ""
+                    for page in pdf.pages
+                ]
+        except (OSError, ValueError, TypeError, RuntimeError) as exc:
             raise PdfParseError(f"Unable to read PDF: {exc}") from exc
         if sum(len(p.strip()) for p in pages) < 20:
             raise PdfParseError("PDF contains no usable text; it may be scanned or malformed")
@@ -54,7 +58,7 @@ class PdfTextExtractor:
 class TallyLedgerParser:
     """Heuristic parser supporting common Tally Prime ledger PDF variants."""
 
-    VOUCHER_ALIASES = {
+    VOUCHER_ALIASES: ClassVar[dict[str, VoucherType]] = {
         "sales": VoucherType.INVOICE,
         "invoice": VoucherType.INVOICE,
         "receipt": VoucherType.RECEIPT,
@@ -121,8 +125,16 @@ class TallyLedgerParser:
         prefix = tail[: money.start()].strip()
         tokens = prefix.split()
         voucher_number = next((t for t in reversed(tokens) if any(c.isdigit() for c in t)), "")
-        debit = amount if side == "dr" or voucher_type in {VoucherType.INVOICE, VoucherType.DEBIT_NOTE} else Decimal(0)
-        credit = amount if side == "cr" or voucher_type in {VoucherType.RECEIPT, VoucherType.CREDIT_NOTE} else Decimal(0)
+        debit = (
+            amount
+            if side == "dr" or voucher_type in {VoucherType.INVOICE, VoucherType.DEBIT_NOTE}
+            else Decimal(0)
+        )
+        credit = (
+            amount
+            if side == "cr" or voucher_type in {VoucherType.RECEIPT, VoucherType.CREDIT_NOTE}
+            else Decimal(0)
+        )
         if debit == 0 and credit == 0:
             debit = amount
         return LedgerTransaction(
@@ -144,14 +156,18 @@ class TallyLedgerParser:
         return VoucherType.UNKNOWN
 
     @staticmethod
-    def _date(value: str):
+    def _date(value: str) -> date | None:
         normalized = value.replace("/", "-").replace(".", "-")
-        for fmt in ("%d-%m-%Y", "%d-%m-%y"):
-            try:
-                return datetime.strptime(normalized, fmt).date()
-            except ValueError:
-                pass
-        return None
+        parts = normalized.split("-")
+        if len(parts) != 3:
+            return None
+        try:
+            day, month, year = (int(part) for part in parts)
+            if year < 100:
+                year += 2000
+            return date(year, month, day)
+        except ValueError:
+            return None
 
     @staticmethod
     def _decimal(value: str) -> Decimal:
@@ -161,7 +177,10 @@ class TallyLedgerParser:
             return Decimal(0)
 
     def _named_balance(self, text: str, label: str) -> Decimal:
-        pattern = re.compile(re.escape(label) + r"[^\d]*(\d[\d,]*(?:\.\d{1,2})?)\s*(Dr|Cr)?", re.IGNORECASE)
+        pattern = re.compile(
+            re.escape(label) + r"[^\d]*(\d[\d,]*(?:\.\d{1,2})?)\s*(Dr|Cr)?",
+            re.IGNORECASE,
+        )
         match = pattern.search(text)
         if not match:
             return Decimal(0)
@@ -170,7 +189,11 @@ class TallyLedgerParser:
 
     @staticmethod
     def _customer_name(text: str, path: Path) -> str:
-        patterns = [r"Ledger Account\s*\n\s*([^\n]+)", r"Ledger:\s*([^\n]+)", r"Account:\s*([^\n]+)"]
+        patterns = [
+            r"Ledger Account\s*\n\s*([^\n]+)",
+            r"Ledger:\s*([^\n]+)",
+            r"Account:\s*([^\n]+)",
+        ]
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
