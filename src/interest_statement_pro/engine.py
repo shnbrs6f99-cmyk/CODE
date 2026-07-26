@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from .domain import (
@@ -31,7 +31,7 @@ class InterestCalculator:
     """Deterministic FIFO allocator and simple-interest calculator."""
 
     def calculate(self, statement: LedgerStatement, rules: InterestRules) -> CalculationResult:
-        cutoff = rules.calculate_through or statement.period_end or date.today()
+        cutoff = rules.calculate_through or statement.period_end or datetime.now(UTC).date()
         charges: deque[_OpenCharge] = deque()
         allocations: list[Allocation] = []
         interest_lines: list[InterestLine] = []
@@ -107,7 +107,10 @@ class InterestCalculator:
                 rules,
             )
 
-        total = _money(sum((line.interest for line in interest_lines), Decimal(0)), rules.round_places)
+        total = _money(
+            sum((line.interest for line in interest_lines), Decimal(0)),
+            rules.round_places,
+        )
         if Decimal(0) < total < rules.minimum_interest:
             total = rules.minimum_interest
         return CalculationResult(
