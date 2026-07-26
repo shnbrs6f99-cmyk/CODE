@@ -5,13 +5,15 @@
 
 ## 1. Launch the application
 
-### Using the Windows executable
+### Using the Windows build artifact
 
-1. Download `InterestStatementGeneratorPro-v0.9.0-beta-win64.exe` from the GitHub pre-release.
-2. Move it to a writable folder such as `Documents\Interest Statement Generator Pro`.
-3. Double-click the executable.
-4. If Windows SmartScreen appears, choose **More info** and then **Run anyway** only after confirming the file came from the official repository release.
-5. The application creates its local database, preferences, and logs under the current Windows user's application-data folder.
+1. Download `InterestStatementGeneratorPro-v0.9.0-beta-win64.zip` from the GitHub pre-release.
+2. Verify its SHA-256 value against `InterestStatementGeneratorPro-v0.9.0-beta-win64.sha256.txt`.
+3. Extract the complete ZIP into a writable folder such as `Documents\Interest Statement Generator Pro`.
+4. Do not move only the `.exe`; the adjacent runtime files in the extracted folder are required.
+5. Double-click `InterestStatementGeneratorPro.exe` inside the extracted folder.
+6. If Windows SmartScreen appears, choose **More info** and then **Run anyway** only after confirming the file came from the official repository release.
+7. The application creates its local database, preferences, and logs under the current Windows user's application-data folder.
 
 ### Running from source
 
