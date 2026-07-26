@@ -5,7 +5,7 @@ hiddenimports = ["customtkinter", "pdfplumber", "pypdf", "openpyxl"]
 datas = collect_data_files("customtkinter")
 
 a = Analysis(
-    ["src/interest_statement_pro/app.py"],
+    ["launcher.py"],
     pathex=["src"],
     binaries=[],
     datas=datas,
