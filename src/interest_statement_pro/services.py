@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Event
-from typing import Callable, Iterable
 
 from .diagnostics import ParserDiagnosticsExporter
 from .domain import CalculationResult, InterestRules

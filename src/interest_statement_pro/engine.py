@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from datetime import date, timedelta
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from .domain import (
     Allocation,
@@ -35,7 +35,7 @@ class InterestCalculator:
         charges: deque[_OpenCharge] = deque()
         allocations: list[Allocation] = []
         interest_lines: list[InterestLine] = []
-        unallocated_credits = Decimal("0")
+        unallocated_credits = Decimal(0)
 
         if rules.include_opening_balance and statement.opening_balance > 0:
             opening_date = statement.period_start or min(
@@ -68,7 +68,7 @@ class InterestCalculator:
                 charges.append(_OpenCharge(tx, amount))
                 continue
 
-            credit = -amount if amount < 0 else Decimal("0")
+            credit = -amount if amount < 0 else Decimal(0)
             if credit <= 0:
                 continue
             while credit > 0 and charges:
@@ -96,7 +96,7 @@ class InterestCalculator:
                     charges.popleft()
             unallocated_credits += credit
 
-        outstanding = Decimal("0")
+        outstanding = Decimal(0)
         for charge in charges:
             outstanding += charge.remaining
             self._append_interest(
@@ -107,8 +107,8 @@ class InterestCalculator:
                 rules,
             )
 
-        total = _money(sum((line.interest for line in interest_lines), Decimal("0")), rules.round_places)
-        if Decimal("0") < total < rules.minimum_interest:
+        total = _money(sum((line.interest for line in interest_lines), Decimal(0)), rules.round_places)
+        if Decimal(0) < total < rules.minimum_interest:
             total = rules.minimum_interest
         return CalculationResult(
             statement=statement,
@@ -132,7 +132,7 @@ class InterestCalculator:
         )
         days = max(0, (settled_date - due).days)
         interest = principal * rules.annual_rate * Decimal(days) / (
-            Decimal("100") * Decimal(rules.day_basis)
+            Decimal(100) * Decimal(rules.day_basis)
         )
         target.append(
             InterestLine(

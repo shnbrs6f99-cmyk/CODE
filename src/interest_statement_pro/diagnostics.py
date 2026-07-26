@@ -7,7 +7,7 @@ import sys
 import traceback
 import zipfile
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .parser import PdfTextExtractor
@@ -65,7 +65,7 @@ class ParserDiagnosticsExporter:
         )
         digest = self._sha256(source) if source.exists() else ""
         manifest = DiagnosticManifest(
-            generated_at_utc=datetime.now(timezone.utc).isoformat(),
+            generated_at_utc=datetime.now(UTC).isoformat(),
             application_version=self.application_version,
             python_version=sys.version,
             platform=platform.platform(),

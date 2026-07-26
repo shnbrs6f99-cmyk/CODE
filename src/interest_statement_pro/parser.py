@@ -12,7 +12,7 @@ from pypdf import PdfReader
 from .domain import LedgerStatement, LedgerTransaction, VoucherType
 
 DATE_RE = re.compile(r"^(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})\s+")
-MONEY_RE = re.compile(r"(?P<amount>[\d,]+(?:\.\d{1,2})?)\s*(?P<side>Dr|Cr)?$", re.I)
+MONEY_RE = re.compile(r"(?P<amount>[\d,]+(?:\.\d{1,2})?)\s*(?P<side>Dr|Cr)?$", re.IGNORECASE)
 
 
 class PdfParseError(RuntimeError):
@@ -85,8 +85,8 @@ class TallyLedgerParser:
         if not transactions:
             warnings.append("No transaction rows were recognized; verify the PDF layout")
         dates = [t.transaction_date for t in transactions]
-        computed = opening + sum((t.signed_amount for t in transactions), Decimal("0"))
-        if closing == Decimal("0") and computed != 0:
+        computed = opening + sum((t.signed_amount for t in transactions), Decimal(0))
+        if closing == Decimal(0) and computed != 0:
             closing = computed
             warnings.append("Closing balance inferred from opening balance and transactions")
         confidence = min(1.0, 0.35 + (0.5 if transactions else 0) + (0.15 if customer else 0))
@@ -121,8 +121,8 @@ class TallyLedgerParser:
         prefix = tail[: money.start()].strip()
         tokens = prefix.split()
         voucher_number = next((t for t in reversed(tokens) if any(c.isdigit() for c in t)), "")
-        debit = amount if side == "dr" or voucher_type in {VoucherType.INVOICE, VoucherType.DEBIT_NOTE} else Decimal("0")
-        credit = amount if side == "cr" or voucher_type in {VoucherType.RECEIPT, VoucherType.CREDIT_NOTE} else Decimal("0")
+        debit = amount if side == "dr" or voucher_type in {VoucherType.INVOICE, VoucherType.DEBIT_NOTE} else Decimal(0)
+        credit = amount if side == "cr" or voucher_type in {VoucherType.RECEIPT, VoucherType.CREDIT_NOTE} else Decimal(0)
         if debit == 0 and credit == 0:
             debit = amount
         return LedgerTransaction(
@@ -158,13 +158,13 @@ class TallyLedgerParser:
         try:
             return Decimal(value.replace(",", ""))
         except InvalidOperation:
-            return Decimal("0")
+            return Decimal(0)
 
     def _named_balance(self, text: str, label: str) -> Decimal:
-        pattern = re.compile(re.escape(label) + r"[^\d]*(\d[\d,]*(?:\.\d{1,2})?)\s*(Dr|Cr)?", re.I)
+        pattern = re.compile(re.escape(label) + r"[^\d]*(\d[\d,]*(?:\.\d{1,2})?)\s*(Dr|Cr)?", re.IGNORECASE)
         match = pattern.search(text)
         if not match:
-            return Decimal("0")
+            return Decimal(0)
         amount = self._decimal(match.group(1))
         return -amount if (match.group(2) or "").lower() == "cr" else amount
 
@@ -172,7 +172,7 @@ class TallyLedgerParser:
     def _customer_name(text: str, path: Path) -> str:
         patterns = [r"Ledger Account\s*\n\s*([^\n]+)", r"Ledger:\s*([^\n]+)", r"Account:\s*([^\n]+)"]
         for pattern in patterns:
-            match = re.search(pattern, text, re.I)
+            match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 return match.group(1).strip(" :-")
         return path.stem
