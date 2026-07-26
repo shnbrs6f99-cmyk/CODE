@@ -1,0 +1,90 @@
+name: Windows Beta Validation and Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v0.9.0-beta-release
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: v0.9.0-beta
+  ARTIFACT_NAME: InterestStatementGeneratorPro-v0.9.0-beta-win64
+
+jobs:
+  validate-build-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+
+      - name: Ruff
+        run: python -m ruff check src tests
+
+      - name: Mypy
+        run: python -m mypy src
+
+      - name: Complete test suite
+        run: python -m pytest --cov=interest_statement_pro --cov-report=term-missing --junitxml=test-results.xml
+
+      - name: Build Windows executable
+        run: pyinstaller --noconfirm --clean InterestStatementGeneratorPro.spec
+
+      - name: Executable smoke check
+        shell: powershell
+        run: |
+          $exe = "dist\InterestStatementGeneratorPro\InterestStatementGeneratorPro.exe"
+          if (-not (Test-Path $exe)) { throw "Executable not found: $exe" }
+          $size = (Get-Item $exe).Length
+          if ($size -lt 100000) { throw "Executable is unexpectedly small: $size bytes" }
+          Write-Host "Executable present: $exe ($size bytes)"
+
+      - name: Package Windows build
+        shell: powershell
+        run: |
+          Compress-Archive -Path "dist\InterestStatementGeneratorPro\*" -DestinationPath "$env:ARTIFACT_NAME.zip" -Force
+          Get-FileHash "$env:ARTIFACT_NAME.zip" -Algorithm SHA256 | Format-List | Out-File "$env:ARTIFACT_NAME.sha256.txt"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: |
+            ${{ env.ARTIFACT_NAME }}.zip
+            ${{ env.ARTIFACT_NAME }}.sha256.txt
+            test-results.xml
+          retention-days: 30
+
+      - name: Create or update beta pre-release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $notes = @"
+          Real-user validation build. Not production-certified.
+
+          Includes the Windows application, parser diagnostics export, sample input/output folders, and TESTING_GUIDE.md.
+
+          Validate results against the original Tally ledger before relying on any calculation.
+          "@
+          gh release view $env:RELEASE_TAG 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:RELEASE_TAG --target $env:GITHUB_SHA --title "Interest Statement Generator Pro v0.9.0 Beta" --notes $notes --prerelease
+          } else {
+            gh release edit $env:RELEASE_TAG --target $env:GITHUB_SHA --title "Interest Statement Generator Pro v0.9.0 Beta" --notes $notes --prerelease
+          }
+          gh release upload $env:RELEASE_TAG "$env:ARTIFACT_NAME.zip" "$env:ARTIFACT_NAME.sha256.txt" --clobber
