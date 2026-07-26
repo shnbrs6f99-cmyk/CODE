@@ -15,9 +15,12 @@ from .domain import InterestRules
 
 class Database:
     def __init__(self, path: Path | None = None) -> None:
-        base = user_data_path("InterestStatementGeneratorPro", "Jinesh")
-        base.mkdir(parents=True, exist_ok=True)
-        self.path = path or (base / "app.db")
+        if path is None:
+            base = user_data_path("InterestStatementGeneratorPro", "Jinesh")
+            self.path = base / "app.db"
+        else:
+            self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         self.migrate()
 
     @contextmanager
