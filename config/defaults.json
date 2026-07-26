@@ -1,0 +1,7 @@
+{
+  "annual_interest_rate": "18.00",
+  "credit_period_days": 0,
+  "max_batch_workers": 4,
+  "diagnostics_include_original_pdf": false,
+  "output_filename_template": "{customer}_Interest_Statement.xlsx"
+}
