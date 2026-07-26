@@ -70,21 +70,21 @@ jobs:
           retention-days: 30
 
       - name: Create or update beta pre-release
-        shell: powershell
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $notes = @"
+          notes=$(cat <<'EOF'
           Real-user validation build. Not production-certified.
 
           Includes the Windows application, parser diagnostics export, sample input/output folders, and TESTING_GUIDE.md.
 
           Validate results against the original Tally ledger before relying on any calculation.
-          "@
-          gh release view $env:RELEASE_TAG 2>$null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $env:RELEASE_TAG --target $env:GITHUB_SHA --title "Interest Statement Generator Pro v0.9.0 Beta" --notes $notes --prerelease
-          } else {
-            gh release edit $env:RELEASE_TAG --target $env:GITHUB_SHA --title "Interest Statement Generator Pro v0.9.0 Beta" --notes $notes --prerelease
-          }
-          gh release upload $env:RELEASE_TAG "$env:ARTIFACT_NAME.zip" "$env:ARTIFACT_NAME.sha256.txt" --clobber
+          EOF
+          )
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --target "$GITHUB_SHA" --title "Interest Statement Generator Pro v0.9.0 Beta" --notes "$notes" --prerelease
+          else
+            gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "Interest Statement Generator Pro v0.9.0 Beta" --notes "$notes" --prerelease
+          fi
+          gh release upload "$RELEASE_TAG" "$ARTIFACT_NAME.zip" "$ARTIFACT_NAME.sha256.txt" --clobber
