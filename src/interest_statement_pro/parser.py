@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import ClassVar
 
 import pdfplumber
+from pdfplumber.utils.exceptions import PdfminerException
 from pypdf import PdfReader
+from pypdf.errors import PyPdfError
 
 from .domain import LedgerStatement, LedgerTransaction, VoucherType
 
@@ -39,7 +41,7 @@ class PdfTextExtractor:
                 return ExtractedPdf(pages=pages, encrypted=reader.is_encrypted)
         except PdfParseError:
             raise
-        except (OSError, ValueError, TypeError, RuntimeError):
+        except (OSError, ValueError, TypeError, RuntimeError, PyPdfError):
             pages = []
 
         try:
@@ -48,7 +50,7 @@ class PdfTextExtractor:
                     page.extract_text(x_tolerance=2, y_tolerance=3) or ""
                     for page in pdf.pages
                 ]
-        except (OSError, ValueError, TypeError, RuntimeError) as exc:
+        except (OSError, ValueError, TypeError, RuntimeError, PdfminerException) as exc:
             raise PdfParseError(f"Unable to read PDF: {exc}") from exc
         if sum(len(p.strip()) for p in pages) < 20:
             raise PdfParseError("PDF contains no usable text; it may be scanned or malformed")
