@@ -25,13 +25,17 @@ jobs:
         shell: powershell
         run: |
           python -m ruff check src tests --fix
+          $ruffExit = $LASTEXITCODE
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src tests
-          if (-not (git diff --cached --quiet)) {
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
             git commit -m "style: apply Ruff autofixes"
             git push origin HEAD:fix/ruff-ci
           }
+          Write-Host "Initial Ruff exit code: $ruffExit"
+          exit 0
       - name: Ruff verification
         run: python -m ruff check src tests
       - name: Mypy
