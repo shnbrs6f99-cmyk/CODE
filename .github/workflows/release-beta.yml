@@ -33,7 +33,7 @@ jobs:
         run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
 
       - name: Ruff
-        run: python -m ruff check src tests
+        run: python -m ruff check launcher.py src tests
 
       - name: Mypy
         run: python -m mypy src
@@ -44,14 +44,9 @@ jobs:
       - name: Build Windows executable
         run: pyinstaller --noconfirm --clean InterestStatementGeneratorPro.spec
 
-      - name: Executable smoke check
+      - name: Launch packaged executable
         shell: powershell
-        run: |
-          $exe = "dist\InterestStatementGeneratorPro\InterestStatementGeneratorPro.exe"
-          if (-not (Test-Path $exe)) { throw "Executable not found: $exe" }
-          $size = (Get-Item $exe).Length
-          if ($size -lt 100000) { throw "Executable is unexpectedly small: $size bytes" }
-          Write-Host "Executable present: $exe ($size bytes)"
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test_packaged_executable.ps1
 
       - name: Package Windows build
         shell: powershell
