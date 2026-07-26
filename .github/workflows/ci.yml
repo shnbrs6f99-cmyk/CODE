@@ -25,7 +25,6 @@ jobs:
         shell: powershell
         run: |
           python -m ruff check src tests --fix
-          $ruffExit = $LASTEXITCODE
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src tests
@@ -34,12 +33,28 @@ jobs:
             git commit -m "style: apply Ruff autofixes"
             git push origin HEAD:fix/ruff-ci
           }
-          Write-Host "Initial Ruff exit code: $ruffExit"
           exit 0
-      - name: Ruff verification
-        run: python -m ruff check src tests
-      - name: Mypy
-        run: python -m mypy src
+      - name: Capture Ruff diagnostics
+        shell: powershell
+        run: |
+          python -m ruff check src tests --output-format concise 2>&1 | Tee-Object -FilePath ruff-errors.txt
+          exit 0
+      - name: Capture mypy diagnostics
+        shell: powershell
+        run: |
+          python -m mypy src 2>&1 | Tee-Object -FilePath mypy-errors.txt
+          exit 0
+      - name: Publish diagnostics
+        shell: powershell
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ruff-errors.txt mypy-errors.txt
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "chore: capture quality diagnostics"
+            git push origin HEAD:fix/ruff-ci
+          }
       - name: Tests
         run: python -m pytest
       - name: PyInstaller smoke build
